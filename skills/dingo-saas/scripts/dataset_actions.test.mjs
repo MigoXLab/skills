@@ -34,6 +34,10 @@ async function withMockApi(run) {
   const { port } = server.address();
   const env = {
     ...process.env,
+    // Isolate from the runner's shell: an exported DINGO_SAAS_API_KEY would
+    // otherwise take precedence over the config file these tests write.
+    DINGO_SAAS_API_KEY: undefined,
+    DINGO_SAAS_KEY: undefined,
     DINGO_SAAS_CONFIG_PATH: configPath,
   };
 
@@ -71,6 +75,7 @@ test("maps dataset actions to their backend APIs", async () => {
       configured: true,
       url,
       key_prefix: "sk-test-to...",
+      path: configPath,
     });
     assert.equal(JSON.parse(await readFile(configPath, "utf8")).key, "sk-test-token");
 
@@ -138,6 +143,7 @@ test("reports, verifies, and clears the saved connection", async () => {
     const status = await runConnectionAction(env, "connection_status");
     assert.deepEqual(status, {
       configured: true,
+      source: "config",
       url,
       key_prefix: "sk-secret-...",
       user: { ok: true },

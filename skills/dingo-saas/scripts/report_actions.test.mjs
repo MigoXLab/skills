@@ -61,7 +61,7 @@ async function withMockApi(run) {
       requests,
       directory,
       url,
-      env: { ...process.env, DINGO_SAAS_CONFIG_PATH: configPath },
+      env: { ...process.env, DINGO_SAAS_API_KEY: undefined, DINGO_SAAS_KEY: undefined, DINGO_SAAS_CONFIG_PATH: configPath },
     });
   } finally {
     await new Promise((resolve, reject) =>
