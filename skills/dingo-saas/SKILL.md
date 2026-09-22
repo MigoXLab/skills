@@ -18,33 +18,47 @@ Use only implemented actions. Do not claim that an unimplemented Dingo SaaS page
 
 ## Connection
 
-Before any Dingo SaaS action, check the saved connection:
+Every action authenticates with a Dingo SaaS API key. Resolve it in this order — the
+scripts do this automatically, so you rarely configure anything:
 
-```powershell
+1. **Environment variable (preferred, zero-config).** If `DINGO_SAAS_API_KEY` is set,
+   it is used directly. `DINGO_SAAS_URL` overrides the endpoint; it defaults to
+   `https://dingo.openxlab.org.cn`. Nothing is written to disk.
+2. **Saved config file.** Otherwise the scripts read `~/.config/dingo-saas/config.json`
+   (override the location with `DINGO_SAAS_CONFIG_PATH`).
+
+Do NOT check the connection up front. Just run the action the user asked for. Only if it
+fails on authentication should you inspect and fix the connection:
+
+```bash
 node scripts/connection_actions.mjs connection_status
 ```
 
-If the response says `configured: false`, immediately ask the user for both the Dingo SaaS
-website URL and API key. Save them with:
+If that reports `configured: false`, the user has no key configured. Ask them for their
+Dingo SaaS API key (get one at `https://dingo.openxlab.org.cn` → Settings), tell them it is
+sensitive, and save it:
 
-```powershell
-node scripts/connection_actions.mjs configure --url <URL> --key <KEY>
+```bash
+node scripts/connection_actions.mjs configure --key <KEY>
 ```
 
-The script persists them in `config.json` in this skill directory. Once saved, reuse that
-connection for every action without asking again. If an API returns 401, ask the user for a
-new URL and key and overwrite the saved configuration with `configure`.
+This writes `~/.config/dingo-saas/config.json` (mode 600) and prints the path. Pass
+`--url <URL>` only for a non-default endpoint. Once configured, reuse the connection for
+every action without asking again. If an API returns 401, the key is invalid or expired —
+ask for a fresh key and re-run `configure`.
 
-Never print or repeat the complete key. `configure` and `connection_status` return only a
-masked key prefix. When the user explicitly asks to forget the connection, run:
+**Security.** Never read `.env` files or search the filesystem for credentials. Never ask
+the user to paste a key into a place where it will be echoed or logged. Never print or
+repeat a complete key — `configure` and `connection_status` return only a masked prefix.
+When the user asks to forget the connection, run:
 
-```powershell
+```bash
 node scripts/connection_actions.mjs clear_config
 ```
 
 Run an action with its page module script:
 
-```powershell
+```bash
 node scripts/dataset_actions.mjs <action> [options]
 node scripts/experiment_actions.mjs <action> [options]
 node scripts/report_actions.mjs <action> [options]

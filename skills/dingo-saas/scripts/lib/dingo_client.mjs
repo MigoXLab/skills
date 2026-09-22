@@ -1,11 +1,20 @@
-import { readFile, rm, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
+import { homedir } from "node:os";
 
-const LIB_DIR = dirname(fileURLToPath(import.meta.url));
-const DEFAULT_CONFIG_PATH = resolve(LIB_DIR, "..", "..", "config.json");
+// Credentials live OUTSIDE the skill install directory, so they survive skill
+// reinstalls, are reachable from any working directory, and never sit next to
+// source that could be committed. Resolution order (highest priority first):
+//   1. DINGO_SAAS_API_KEY / DINGO_SAAS_KEY  (+ optional DINGO_SAAS_URL) env vars
+//   2. config.json at DINGO_SAAS_CONFIG_PATH, or the XDG default below
+const XDG_CONFIG_HOME = process.env.XDG_CONFIG_HOME || join(homedir(), ".config");
+const DEFAULT_CONFIG_PATH = join(XDG_CONFIG_HOME, "dingo-saas", "config.json");
 
 export const CONFIG_PATH = process.env.DINGO_SAAS_CONFIG_PATH || DEFAULT_CONFIG_PATH;
+
+// Production is the only user-facing environment, so an env-var connection that
+// omits DINGO_SAAS_URL defaults here.
+const DEFAULT_URL = "https://dingo.openxlab.org.cn";
 
 export function parseArgs(argv) {
   const parsed = { _: [] };
@@ -92,13 +101,26 @@ export function maskKey(key) {
 }
 
 export async function loadConnection({ allowMissing = false } = {}) {
+  // 1. Environment variables take precedence — the zero-config path for CI and
+  //    for users who export DINGO_SAAS_API_KEY in their shell profile.
+  const envKey = process.env.DINGO_SAAS_API_KEY || process.env.DINGO_SAAS_KEY;
+  if (envKey && envKey.trim() !== "") {
+    return {
+      url: normalizeBaseUrl(process.env.DINGO_SAAS_URL || DEFAULT_URL),
+      key: envKey.trim(),
+    };
+  }
+
+  // 2. Fall back to the saved config file.
   let raw;
   try {
     raw = await readFile(CONFIG_PATH, "utf8");
   } catch (error) {
     if (allowMissing && error.code === "ENOENT") return null;
     if (error.code === "ENOENT") {
-      throw new Error("Dingo SaaS is not configured. Ask the user for the website URL and API key, then run configure.");
+      throw new Error(
+        "Dingo SaaS is not configured. Set the DINGO_SAAS_API_KEY environment variable, or ask the user for the API key and run configure.",
+      );
     }
     throw error;
   }
@@ -118,13 +140,14 @@ export async function loadConnection({ allowMissing = false } = {}) {
 }
 
 export async function configureConnection(args) {
-  const url = normalizeBaseUrl(requireOption(args, "url"));
+  const url = normalizeBaseUrl(args.url ? requireOption(args, "url") : DEFAULT_URL);
   const key = requireOption(args, "key");
+  await mkdir(dirname(CONFIG_PATH), { recursive: true });
   await writeFile(CONFIG_PATH, `${JSON.stringify({ url, key }, null, 2)}\n`, {
     encoding: "utf8",
     mode: 0o600,
   });
-  return { configured: true, url, key_prefix: maskKey(key) };
+  return { configured: true, url, key_prefix: maskKey(key), path: CONFIG_PATH };
 }
 
 export async function clearConnection() {
@@ -224,9 +247,12 @@ export async function downloadApiFile(path, outputPath) {
 export async function getConnectionStatus() {
   const connection = await loadConnection({ allowMissing: true });
   if (!connection) return { configured: false };
+  const envKey = process.env.DINGO_SAAS_API_KEY || process.env.DINGO_SAAS_KEY;
+  const source = envKey && envKey.trim() !== "" ? "env" : "config";
   const user = await callApi("GET", "/api/v1/auth/me");
   return {
     configured: true,
+    source,
     url: connection.url,
     key_prefix: maskKey(connection.key),
     user,
