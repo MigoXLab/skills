@@ -88,5 +88,8 @@ timezone Asia/Shanghai.
 Find the most recent MinerU extraction quality report and send it to me.
 ```
 
+Report names are not unique. When you provide an exact report name, the skill applies the
+server-side name filter and shows every matching report so you can identify the intended one.
+
 There's more you can do with datasets, metrics, experiments, and reports through the skill.
 See [SKILL.md](SKILL.md) for the full list of actions and execution constraints.
