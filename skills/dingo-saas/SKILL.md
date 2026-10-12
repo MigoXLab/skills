@@ -170,8 +170,10 @@ Reports have three distinct page scopes. Keep them separate when interpreting th
 
 Use `node scripts/report_actions.mjs actions` to see parameters.
 
-`list_reports` supports experiment, status, creation-date, and pagination filters. Its optional
-`--search` matches report ID, name, or description within the returned page, like the report page.
+`list_reports` supports exact report-name (`--name`), experiment, status, creation-date, and
+pagination filters. Exact-name filtering runs on the server and can return multiple reports because
+report names are not unique. Its optional `--search` matches report ID, name, or description within
+the returned page, like the report page.
 `list_report_results` supports `eval_status` (`all`, `true`, or `false`) and label filtering.
 
 The detail page and results page are not interchangeable. `get_report_detail` returns report

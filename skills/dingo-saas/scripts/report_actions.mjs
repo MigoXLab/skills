@@ -20,7 +20,7 @@ const ACTIONS = {
     method: "GET",
     path: "/api/v1/outputs/",
     options:
-      "[--experiment-id ID] [--status STATUS] [--created-at YYYY-MM-DD] [--search TEXT] [--skip N] [--limit N]",
+      "[--name NAME] [--experiment-id ID] [--status STATUS] [--created-at YYYY-MM-DD] [--search TEXT] [--skip N] [--limit N]",
   },
   get_report_detail: {
     page: "report_detail",
@@ -113,6 +113,7 @@ async function execute(action, args) {
     case "list_reports": {
       const result = await callApi("GET", ACTIONS[action].path, {
         query: {
+          name: args.name,
           experiment_id: args["experiment-id"],
           status: args.status,
           created_at: args["created-at"],

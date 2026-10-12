@@ -81,6 +81,8 @@ test("maps report page actions to backend APIs", async () => {
     const reports = await runAction(
       env,
       "list_reports",
+      "--name",
+      "Alpha report",
       "--experiment-id",
       "experiment/1",
       "--status",
@@ -114,7 +116,7 @@ test("maps report page actions to backend APIs", async () => {
     assert.deepEqual(
       requests.map(({ method, url: requestUrl }) => ({ method, url: requestUrl })),
       [
-        { method: "GET", url: "/api/v1/outputs/?experiment_id=experiment%2F1&status=success&created_at=2026-09-11&skip=2&limit=5" },
+        { method: "GET", url: "/api/v1/outputs/?name=Alpha+report&experiment_id=experiment%2F1&status=success&created_at=2026-09-11&skip=2&limit=5" },
         { method: "GET", url: "/api/v1/outputs/report%2F1" },
         { method: "PUT", url: "/api/v1/outputs/r1" },
         { method: "DELETE", url: "/api/v1/outputs/r1" },
