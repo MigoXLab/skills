@@ -86,12 +86,86 @@ test("maps experiment page actions to backend APIs", async () => {
       ],
     );
     assert.ok(requests.every((request) => request.authorization === "Bearer sk-experiment-test"));
+    assert.deepEqual(JSON.parse(requests[2].body), {
+      name: "New",
+      dataset_id: "d1",
+      dingo_config: {
+        executor: {
+          result_save: {
+            merge: false,
+            bad: true,
+            good: false,
+            raw: true,
+            all_labels: false,
+          },
+        },
+      },
+    });
     assert.deepEqual(JSON.parse(requests[4].body), { name: "Copied" });
     assert.deepEqual(JSON.parse(requests[6].body), {
       report_name: "Report",
       report_description: "Description",
     });
     assert.deepEqual(JSON.parse(requests[10].body), { enabled: false });
+  });
+});
+
+test("preserves explicit Dingo result-save overrides and unrelated executor config", async () => {
+  await withMockApi(async ({ requests, env }) => {
+    await runAction(
+      env,
+      "create_experiment",
+      "--body",
+      JSON.stringify({
+        name: "Custom result save",
+        dataset_id: "d1",
+        task_type: "dingo",
+        dingo_config: {
+          log_level: "INFO",
+          executor: {
+            max_workers: 4,
+            result_save: { good: true },
+          },
+        },
+      }),
+    );
+
+    assert.deepEqual(JSON.parse(requests[0].body), {
+      name: "Custom result save",
+      dataset_id: "d1",
+      task_type: "dingo",
+      dingo_config: {
+        log_level: "INFO",
+        executor: {
+          max_workers: 4,
+          result_save: {
+            merge: false,
+            bad: true,
+            good: true,
+            raw: true,
+            all_labels: false,
+          },
+        },
+      },
+    });
+  });
+});
+
+test("does not add Dingo result-save config to non-Dingo experiments", async () => {
+  await withMockApi(async ({ requests, env }) => {
+    await runAction(
+      env,
+      "create_experiment",
+      "--body",
+      '{"name":"Bench","dataset_id":"d1","task_type":"bench","config_yaml":"x"}',
+    );
+
+    assert.deepEqual(JSON.parse(requests[0].body), {
+      name: "Bench",
+      dataset_id: "d1",
+      task_type: "bench",
+      config_yaml: "x",
+    });
   });
 });
 

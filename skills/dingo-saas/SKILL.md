@@ -117,7 +117,22 @@ Use `node scripts/experiment_actions.mjs actions` to see parameters.
 
 `create_experiment` accepts the backend `ExperimentCreate` JSON body. Common fields are
 `name`, `description`, `dataset_id`, `task_type`, `evaluators`, `dingo_config`, `config_yaml`,
-and `retrieval_config`. `update_experiment` accepts the corresponding editable fields.
+and `retrieval_config`. When creating a Dingo experiment (`task_type` omitted or `dingo`), the
+action defaults `dingo_config.executor.result_save` to:
+
+```json
+{
+  "merge": false,
+  "bad": true,
+  "good": false,
+  "raw": true,
+  "all_labels": false
+}
+```
+
+Explicit values in `dingo_config.executor.result_save` override these defaults. The action does
+not add this Dingo executor configuration to other task types. `update_experiment` accepts the
+corresponding editable fields without applying create-time defaults.
 
 `upsert_experiment_schedule` accepts:
 
@@ -179,13 +194,18 @@ the returned page, like the report page.
 The detail page and results page are not interchangeable. `get_report_detail` returns report
 metadata, Dingo input, execution status, and `dingo_result`. The results page additionally needs
 the paginated records from `output-items`; use `get_report_results` to retrieve both parts. Treat
-`dingo_result.summary` as the results-page summary, not as the individual result rows.
+`dingo_result.summary` as the results-page summary, not as the individual result rows. For standard
+Dingo and Retrieval reports, `dingo_result.summary.task_id` is the report ID (`Output.id`).
 
 `update_report` accepts a JSON body containing only the page-editable fields `name` and/or
 `description`. `get_report_log` returns the persisted log, or the report message when no log was
 captured. `get_report_share_url` only constructs the existing public URL; it does not create a
-share token or change server state. `download_report` requires `--output PATH` and saves the ZIP
-archive to that location without overwriting an existing file.
+share token or change server state. On that public page, `dingo_result.summary` is intentionally
+limited to `task_id`, `task_name`, `create_time`, `finish_time`, `score`, `num_good`, `num_bad`,
+`total`, `type_count`, `type_ratio`, `label_stats`, `metrics_score_stats`, `token_usage_stats`, and
+`statistics`; use authenticated report actions when other report details are needed.
+`download_report` requires `--output PATH` and saves the ZIP archive to that location without
+overwriting an existing file.
 
 ## Metric Actions
 
