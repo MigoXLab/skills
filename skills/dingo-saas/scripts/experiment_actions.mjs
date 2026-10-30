@@ -78,6 +78,50 @@ const ACTIONS = {
   },
 };
 
+const DEFAULT_DINGO_RESULT_SAVE = Object.freeze({
+  merge: false,
+  bad: true,
+  good: false,
+  raw: true,
+  all_labels: false,
+});
+
+function withDefaultDingoResultSave(body) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return body;
+  if ((body.task_type || "dingo") !== "dingo") return body;
+
+  const dingoConfig =
+    body.dingo_config && typeof body.dingo_config === "object" && !Array.isArray(body.dingo_config)
+      ? body.dingo_config
+      : {};
+  const executor =
+    dingoConfig.executor &&
+    typeof dingoConfig.executor === "object" &&
+    !Array.isArray(dingoConfig.executor)
+      ? dingoConfig.executor
+      : {};
+  const resultSave =
+    executor.result_save &&
+    typeof executor.result_save === "object" &&
+    !Array.isArray(executor.result_save)
+      ? executor.result_save
+      : {};
+
+  return {
+    ...body,
+    dingo_config: {
+      ...dingoConfig,
+      executor: {
+        ...executor,
+        result_save: {
+          ...DEFAULT_DINGO_RESULT_SAVE,
+          ...resultSave,
+        },
+      },
+    },
+  };
+}
+
 function showActions() {
   writeResult(
     Object.entries(ACTIONS).map(([action, definition]) => ({ action, ...definition })),
@@ -114,7 +158,9 @@ async function execute(action, args) {
     case "get_experiment_dingo_input":
       return callApi(ACTIONS[action].method, experimentPath(action, args));
     case "create_experiment":
-      return callApi("POST", ACTIONS[action].path, { json: await readJsonBody(args) });
+      return callApi("POST", ACTIONS[action].path, {
+        json: withDefaultDingoResultSave(await readJsonBody(args)),
+      });
     case "update_experiment":
     case "upsert_experiment_schedule":
       return callApi(ACTIONS[action].method, experimentPath(action, args), {

@@ -57,6 +57,9 @@ The agent works through it in order:
 3. Create and start the experiment after you pick a metric.
 4. Poll the status and send you the report once it completes.
 
+For a newly created Dingo experiment, the skill saves bad and raw result files by default;
+merge, good, and all-label result files are disabled unless you explicitly enable them.
+
 When done, you get a result like:
 
 | Item | Example |
@@ -90,6 +93,11 @@ Find the most recent MinerU extraction quality report and send it to me.
 
 Report names are not unique. When you provide an exact report name, the skill applies the
 server-side name filter and shows every matching report so you can identify the intended one.
+For standard Dingo and Retrieval reports, the summary `task_id` is the report ID, so a saved
+Dingo summary can be traced directly back to its Dingo SaaS report.
+
+Public share pages intentionally expose only the safe summary fields documented in `SKILL.md`.
+Use an authenticated report action when you need the complete stored report details.
 
 There's more you can do with datasets, metrics, experiments, and reports through the skill.
 See [SKILL.md](SKILL.md) for the full list of actions and execution constraints.
