@@ -53,7 +53,8 @@ async function runAction(env, ...args) {
 
 test("maps experiment page actions to backend APIs", async () => {
   await withMockApi(async ({ requests, env }) => {
-    await runAction(env, "list_experiments", "--dataset-id", "dataset/1", "--skip", "2", "--limit", "5");
+    await runAction(env, "get_experiment_stats");
+    await runAction(env, "list_experiments", "--dataset-id", "dataset/1", "--status", "running", "--name", "quality test", "--skip", "2", "--limit", "5");
     await runAction(env, "get_experiment", "--experiment-id", "experiment/1");
     await runAction(env, "create_experiment", "--body", '{"name":"New","dataset_id":"d1"}');
     await runAction(env, "update_experiment", "--experiment-id", "e1", "--body", '{"name":"Renamed"}');
@@ -70,7 +71,8 @@ test("maps experiment page actions to backend APIs", async () => {
     assert.deepEqual(
       requests.map(({ method, url }) => ({ method, url })),
       [
-        { method: "GET", url: "/api/v1/experiments/?dataset_id=dataset%2F1&skip=2&limit=5" },
+        { method: "GET", url: "/api/v1/experiments/stats" },
+        { method: "GET", url: "/api/v1/experiments/?dataset_id=dataset%2F1&status=running&name=quality+test&skip=2&limit=5" },
         { method: "GET", url: "/api/v1/experiments/experiment%2F1" },
         { method: "POST", url: "/api/v1/experiments/" },
         { method: "PUT", url: "/api/v1/experiments/e1" },
@@ -86,7 +88,7 @@ test("maps experiment page actions to backend APIs", async () => {
       ],
     );
     assert.ok(requests.every((request) => request.authorization === "Bearer sk-experiment-test"));
-    assert.deepEqual(JSON.parse(requests[2].body), {
+    assert.deepEqual(JSON.parse(requests[3].body), {
       name: "New",
       dataset_id: "d1",
       dingo_config: {
@@ -101,12 +103,12 @@ test("maps experiment page actions to backend APIs", async () => {
         },
       },
     });
-    assert.deepEqual(JSON.parse(requests[4].body), { name: "Copied" });
-    assert.deepEqual(JSON.parse(requests[6].body), {
+    assert.deepEqual(JSON.parse(requests[5].body), { name: "Copied" });
+    assert.deepEqual(JSON.parse(requests[7].body), {
       report_name: "Report",
       report_description: "Description",
     });
-    assert.deepEqual(JSON.parse(requests[10].body), { enabled: false });
+    assert.deepEqual(JSON.parse(requests[11].body), { enabled: false });
   });
 });
 

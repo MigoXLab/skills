@@ -11,6 +11,12 @@ import {
 } from "./lib/dingo_client.mjs";
 
 const ACTIONS = {
+  get_metric_stats: {
+    tab: "metric_list",
+    method: "GET",
+    path: "/api/v1/metrics/stats",
+    options: "",
+  },
   list_metrics: {
     tab: "metric_list",
     method: "GET",
@@ -202,6 +208,8 @@ function customMetricEvaluator(metric) {
 
 async function execute(action, args) {
   switch (action) {
+    case "get_metric_stats":
+      return callApi("GET", ACTIONS[action].path);
     case "list_metrics": {
       const metricType = parseMetricType(args);
       const result = await callApi("GET", ACTIONS[action].path, {

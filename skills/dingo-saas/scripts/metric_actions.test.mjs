@@ -79,6 +79,7 @@ async function runAction(env, ...args) {
 
 test("maps metric page actions to backend APIs", async () => {
   await withMockApi(async ({ requests, env }) => {
+    await runAction(env, "get_metric_stats");
     const catalog = await runAction(env, "list_metrics", "--search", "quality");
     await runAction(env, "list_metric_groups", "--name", "Core", "--skip", "1", "--limit", "5");
     await runAction(env, "create_metric_group", "--body", '{"name":"Core","description":"Checks"}');
@@ -103,6 +104,7 @@ test("maps metric page actions to backend APIs", async () => {
     assert.deepEqual(
       requests.map(({ method, url }) => ({ method, url })),
       [
+        { method: "GET", url: "/api/v1/metrics/stats" },
         { method: "GET", url: "/api/v1/metrics/list" },
         { method: "GET", url: "/api/v1/metric-groups/?name=Core&skip=1&limit=5" },
         { method: "POST", url: "/api/v1/metric-groups/" },
@@ -125,16 +127,16 @@ test("maps metric page actions to backend APIs", async () => {
       ],
     );
     assert.ok(requests.every((request) => request.authorization === "Bearer sk-metric-test"));
-    assert.deepEqual(JSON.parse(requests[5].body), {
+    assert.deepEqual(JSON.parse(requests[6].body), {
       group_id: "g1",
       name: "RuleLength",
       config: null,
     });
-    assert.equal(JSON.parse(requests[7].body).name, "LLMCustomMetric");
-    assert.equal(JSON.parse(requests[7].body).config.key, "CUSTOM_LLM_METRIC_KEY");
-    assert.deepEqual(JSON.parse(requests[17].body).data, { content: "hello" });
+    assert.equal(JSON.parse(requests[8].body).name, "LLMCustomMetric");
+    assert.equal(JSON.parse(requests[8].body).config.key, "CUSTOM_LLM_METRIC_KEY");
+    assert.deepEqual(JSON.parse(requests[18].body).data, { content: "hello" });
     assert.equal(
-      JSON.parse(requests[17].body).evaluators[0].config.key,
+      JSON.parse(requests[18].body).evaluators[0].config.key,
       "CUSTOM_LLM_METRIC_KEY",
     );
   });

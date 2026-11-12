@@ -11,10 +11,15 @@ import {
 } from "./lib/dingo_client.mjs";
 
 const ACTIONS = {
+  get_experiment_stats: {
+    method: "GET",
+    path: "/api/v1/experiments/stats",
+    options: "",
+  },
   list_experiments: {
     method: "GET",
     path: "/api/v1/experiments/",
-    options: "[--dataset-id ID] [--skip N] [--limit N]",
+    options: "[--dataset-id ID] [--status STATUS] [--name NAME] [--skip N] [--limit N]",
   },
   get_experiment: {
     method: "GET",
@@ -143,10 +148,14 @@ function parseBooleanOption(args, name) {
 
 async function execute(action, args) {
   switch (action) {
+    case "get_experiment_stats":
+      return callApi("GET", ACTIONS[action].path);
     case "list_experiments":
       return callApi("GET", ACTIONS[action].path, {
         query: {
           dataset_id: args["dataset-id"],
+          status: args.status,
+          name: args.name,
           skip: parseIntegerOption(args, "skip", 0),
           limit: parseIntegerOption(args, "limit", 100),
         },

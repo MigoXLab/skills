@@ -4,6 +4,11 @@ The Dingo SaaS skill lets you manage datasets and metrics, run experiments, and 
 reports through natural language. Just describe your evaluation goal — the agent finds the
 resources, calls the Dingo SaaS API, and completes the steps in the right order.
 
+Experiment listing supports server-side pagination, name-or-ID search, and status filtering; list responses
+also include full status counts for paginated clients.
+Count-only requests use dedicated statistics actions for datasets, experiments, reports, and
+the system-wide SDK metric catalog instead of loading paginated resource lists.
+
 ## Before you start
 
 All you need is a valid Dingo SaaS API key. Sign in to [Dingo SaaS](https://dingo.openxlab.org.cn),
@@ -97,7 +102,11 @@ For standard Dingo and Retrieval reports, the summary `task_id` is the report ID
 Dingo summary can be traced directly back to its Dingo SaaS report.
 
 Public share pages intentionally expose only the safe summary fields documented in `SKILL.md`.
+Downloaded report archives apply the same allowlist to `summary.json` while leaving other files
+unchanged.
 Use an authenticated report action when you need the complete stored report details.
+Successful reports can also generate a persisted, fixed-format Markdown AI summary from the report data.
+Result rows can be located efficiently by their exact `dingo_id` through the report actions.
 
 There's more you can do with datasets, metrics, experiments, and reports through the skill.
 See [SKILL.md](SKILL.md) for the full list of actions and execution constraints.

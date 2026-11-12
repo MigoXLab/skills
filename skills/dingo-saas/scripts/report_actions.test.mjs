@@ -41,9 +41,9 @@ async function withMockApi(run) {
       }));
       return;
     }
-    if (request.url === "/api/v1/outputs/r1") {
+    if (request.url === "/api/v1/outputs/r1/log") {
       response.writeHead(200, { "Content-Type": "application/json" });
-      response.end(JSON.stringify({ id: "r1", status: "failed", log: "trace output", message: "fallback" }));
+      response.end(JSON.stringify({ output_id: "r1", status: "failed", source: "inline", log: "trace output" }));
       return;
     }
 
@@ -78,6 +78,7 @@ async function runAction(env, ...args) {
 
 test("maps report page actions to backend APIs", async () => {
   await withMockApi(async ({ requests, directory, env, url }) => {
+    await runAction(env, "get_report_stats");
     const reports = await runAction(
       env,
       "list_reports",
@@ -97,9 +98,12 @@ test("maps report page actions to backend APIs", async () => {
       "5",
     );
     await runAction(env, "get_report_detail", "--report-id", "report/1");
+    await runAction(env, "generate_report_ai_summary", "--report-id", "report/1");
+    await runAction(env, "get_report_ai_summary", "--report-id", "report/1");
+    await runAction(env, "delete_report_ai_summary", "--report-id", "report/1");
     await runAction(env, "update_report", "--report-id", "r1", "--body", '{"name":"Renamed","description":"Updated"}');
     await runAction(env, "delete_report", "--report-id", "r1");
-    await runAction(env, "list_report_results", "--report-id", "report/1", "--eval-status", "false", "--label", "bad", "--skip", "3", "--limit", "7");
+    await runAction(env, "list_report_results", "--report-id", "report/1", "--dingo-id", "9917", "--eval-status", "false", "--label", "bad", "--skip", "3", "--limit", "7");
     await runAction(env, "get_report_result", "--item-id", "item/1");
     const log = await runAction(env, "get_report_log", "--report-id", "r1");
     const share = await runAction(env, "get_report_share_url", "--report-id", "report/1");
@@ -109,25 +113,29 @@ test("maps report page actions to backend APIs", async () => {
     assert.equal(reports.total, 1);
     assert.equal(reports.source_total, 2);
     assert.equal(reports.items[0].id, "r1");
-    assert.deepEqual(log, { report_id: "r1", status: "failed", log: "trace output" });
+    assert.deepEqual(log, { report_id: "r1", status: "failed", source: "inline", log: "trace output" });
     assert.deepEqual(share, { report_id: "report/1", url: `${url}/share/report%2F1` });
     assert.equal(download.bytes, 12);
     assert.equal(await readFile(outputPath, "utf8"), "zip-contents");
     assert.deepEqual(
       requests.map(({ method, url: requestUrl }) => ({ method, url: requestUrl })),
       [
+        { method: "GET", url: "/api/v1/outputs/stats" },
         { method: "GET", url: "/api/v1/outputs/?name=Alpha+report&experiment_id=experiment%2F1&status=success&created_at=2026-09-11&skip=2&limit=5" },
         { method: "GET", url: "/api/v1/outputs/report%2F1" },
+        { method: "POST", url: "/api/v1/outputs/report%2F1/ai-summary" },
+        { method: "GET", url: "/api/v1/outputs/report%2F1/ai-summary" },
+        { method: "DELETE", url: "/api/v1/outputs/report%2F1/ai-summary" },
         { method: "PUT", url: "/api/v1/outputs/r1" },
         { method: "DELETE", url: "/api/v1/outputs/r1" },
-        { method: "GET", url: "/api/v1/output-items/output/report%2F1?skip=3&limit=7&eval_status=false&label=bad" },
+        { method: "GET", url: "/api/v1/output-items/output/report%2F1?skip=3&limit=7&eval_status=false&label=bad&dingo_id=9917" },
         { method: "GET", url: "/api/v1/output-items/item%2F1" },
-        { method: "GET", url: "/api/v1/outputs/r1" },
+        { method: "GET", url: "/api/v1/outputs/r1/log" },
         { method: "GET", url: "/api/v1/outputs/r1/download" },
       ],
     );
     assert.ok(requests.every((request) => request.authorization === "Bearer sk-report-test"));
-    assert.deepEqual(JSON.parse(requests[2].body), { name: "Renamed", description: "Updated" });
+    assert.deepEqual(JSON.parse(requests[6].body), { name: "Renamed", description: "Updated" });
   });
 });
 
@@ -152,6 +160,8 @@ test("loads the report results page as report summary plus result rows", async (
       "true",
       "--label",
       "quality",
+      "--dingo-id",
+      "1308",
       "--limit",
       "10",
     );
@@ -160,7 +170,7 @@ test("loads the report results page as report summary plus result rows", async (
     assert.deepEqual(
       requests.map(({ method, url }) => ({ method, url })).sort((a, b) => a.url.localeCompare(b.url)),
       [
-        { method: "GET", url: "/api/v1/output-items/output/report%2F1?skip=0&limit=10&eval_status=true&label=quality" },
+        { method: "GET", url: "/api/v1/output-items/output/report%2F1?skip=0&limit=10&eval_status=true&label=quality&dingo_id=1308" },
         { method: "GET", url: "/api/v1/outputs/report%2F1" },
       ],
     );
