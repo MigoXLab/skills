@@ -79,18 +79,27 @@ test("maps dataset actions to their backend APIs", async () => {
     });
     assert.equal(JSON.parse(await readFile(configPath, "utf8")).key, "sk-test-token");
 
+    await runAction(env, "get_dataset_stats");
     await runAction(env, "list_datasets", "--source", "sql", "--skip", "2", "--limit", "5");
     await runAction(env, "get_dataset", "--dataset-id", "data/id");
     await runAction(env, "preview_dataset", "--dataset-id", "abc");
     await runAction(env, "initialize_demo_data");
     await runAction(env, "create_dataset", "--body", '{"name":"New","source":"local","format":"jsonl"}');
-    await runAction(env, "update_dataset", "--dataset-id", "abc", "--body", '{"name":"Renamed"}');
+    await runAction(
+      env,
+      "update_dataset",
+      "--dataset-id",
+      "abc",
+      "--body",
+      '{"name":"Renamed","format":"ms_swift"}',
+    );
     await runAction(env, "copy_dataset", "--dataset-id", "abc");
     await runAction(env, "delete_dataset", "--dataset-id", "abc", "--hard-delete");
 
     assert.deepEqual(
       requests.map(({ method, url }) => ({ method, url })),
       [
+        { method: "GET", url: "/api/v1/datasets/stats" },
         { method: "GET", url: "/api/v1/datasets/?source=sql&skip=2&limit=5" },
         { method: "GET", url: "/api/v1/datasets/data%2Fid" },
         { method: "GET", url: "/api/v1/datasets/abc/preview" },
@@ -102,8 +111,9 @@ test("maps dataset actions to their backend APIs", async () => {
       ],
     );
     assert.ok(requests.every((request) => request.authorization === "Bearer sk-test-token"));
-    assert.equal(JSON.parse(requests[4].body).name, "New");
-    assert.equal(JSON.parse(requests[5].body).name, "Renamed");
+    assert.equal(JSON.parse(requests[5].body).name, "New");
+    assert.equal(JSON.parse(requests[6].body).name, "Renamed");
+    assert.equal(JSON.parse(requests[6].body).format, "ms_swift");
   });
 });
 

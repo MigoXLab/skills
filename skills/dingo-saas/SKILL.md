@@ -71,6 +71,7 @@ Resolve the script path relative to this `SKILL.md` file.
 
 | User intent | Action | Backend API |
 |---|---|---|
+| Count my datasets | `get_dataset_stats` | `GET /api/v1/datasets/stats` |
 | List, search, or locate datasets | `list_datasets` | `GET /api/v1/datasets/` |
 | View dataset details | `get_dataset` | `GET /api/v1/datasets/{dataset_id}` |
 | Preview dataset rows | `preview_dataset` | `GET /api/v1/datasets/{dataset_id}/preview` |
@@ -95,12 +96,43 @@ Use `node scripts/dataset_actions.mjs actions` to see parameters.
 }
 ```
 
-`update_dataset` accepts any of `name`, `description`, `config`, and `status`.
+For local datasets, `format` is a free-form, non-empty Dingo format identifier up to 50
+characters. The backend preserves the value exactly as supplied without changing case or
+trimming whitespace. Upload files normally, then set the desired semantic format in `create_dataset`;
+for example, an uploaded `.jsonl` file may use `ms_swift` or another custom format. The upload
+response reports the file-extension format only. S3 also accepts a free-form format identifier,
+but Test/Create validates it against the installed Dingo SDK. HuggingFace and SQL retain their
+fixed source-specific format restrictions.
+
+For an S3 dataset, put the full URI in the Dataset's top-level `storage_path`. Keep only
+the Dingo-aligned connection fields in `config`; do not put `input_path`, `bucket`, `key`,
+or `s3_bucket` inside `config`:
+
+```json
+{
+  "name": "S3 dataset",
+  "source": "s3",
+  "format": "jsonl",
+  "storage_path": "s3://bucket/path/to/data.jsonl",
+  "config": {
+    "s3_ak": "access-key",
+    "s3_sk": "secret-key",
+    "s3_endpoint_url": "https://s3.example.com",
+    "s3_addressing_style": "path"
+  }
+}
+```
+
+`update_dataset` accepts any of `name`, `format`, `description`, `config`, and `status`.
+Changing a local or S3 dataset from `jsonl` to `ms_swift` or another supported value only
+updates the dataset record; it does not delete, move, or re-upload the stored files. S3 format
+updates are validated against the installed Dingo SDK.
 
 ## Experiment Actions
 
 | User intent | Action | Backend API |
 |---|---|---|
+| Count my experiments | `get_experiment_stats` | `GET /api/v1/experiments/stats` |
 | List, filter, or locate experiments | `list_experiments` | `GET /api/v1/experiments/` |
 | View or edit experiment details | `get_experiment`, `update_experiment` | `GET/PUT /api/v1/experiments/{experiment_id}` |
 | Create an experiment | `create_experiment` | `POST /api/v1/experiments/` |
@@ -114,6 +146,12 @@ Use `node scripts/dataset_actions.mjs actions` to see parameters.
 | View generated Dingo input | `get_experiment_dingo_input` | `GET /api/v1/experiments/{experiment_id}/dingo-input` |
 
 Use `node scripts/experiment_actions.mjs actions` to see parameters.
+
+`list_experiments` supports `--dataset-id`, `--status`, `--name`, `--skip`, and `--limit`.
+Valid status values are `new`, `running`, `success`, `failed`, and `stopped`.
+The name option performs a case-insensitive contains search across experiment names and IDs.
+The response `total` reflects the active filters, while `status_counts` reports the
+full per-status counts before the status filter is applied.
 
 `create_experiment` accepts the backend `ExperimentCreate` JSON body. Common fields are
 `name`, `description`, `dataset_id`, `task_type`, `evaluators`, `dingo_config`, `config_yaml`,
@@ -158,11 +196,15 @@ Reports have three distinct page scopes. Keep them separate when interpreting th
 
 | User intent | Action | Backend API |
 |---|---|---|
+| Count my reports | `get_report_stats` | `GET /api/v1/outputs/stats` |
 | List, search, or filter reports | `list_reports` | `GET /api/v1/outputs/` |
 | Delete a report | `delete_report` | `DELETE /api/v1/outputs/{report_id}` |
-| View a report's execution log | `get_report_log` | `GET /api/v1/outputs/{report_id}` |
+| View a report's execution log | `get_report_log` | `GET /api/v1/outputs/{report_id}/log` |
 | Get the public share URL | `get_report_share_url` | Local URL composition: `/share/{report_id}` |
 | Download the report archive | `download_report` | `GET /api/v1/outputs/{report_id}/download` |
+| Read the persisted AI summary | `get_report_ai_summary` | `GET /api/v1/outputs/{report_id}/ai-summary` |
+| Generate a new AI summary | `generate_report_ai_summary` | `POST /api/v1/outputs/{report_id}/ai-summary` |
+| Delete the AI summary | `delete_report_ai_summary` | `DELETE /api/v1/outputs/{report_id}/ai-summary` |
 
 ### Report Detail Page
 
@@ -189,7 +231,11 @@ Use `node scripts/report_actions.mjs actions` to see parameters.
 pagination filters. Exact-name filtering runs on the server and can return multiple reports because
 report names are not unique. Its optional `--search` matches report ID, name, or description within
 the returned page, like the report page.
-`list_report_results` supports `eval_status` (`all`, `true`, or `false`) and label filtering.
+`list_report_results` supports exact indexed Dingo row lookup with `--dingo-id`,
+`eval_status` (`all`, `true`, or `false`), and label filtering.
+`get_report_ai_summary` reads the stored Markdown summary. `generate_report_ai_summary` uses the
+server's system LLM configuration and requires that no summary currently exists; delete the old
+summary with `delete_report_ai_summary` before regenerating it.
 
 The detail page and results page are not interchangeable. `get_report_detail` returns report
 metadata, Dingo input, execution status, and `dingo_result`. The results page additionally needs
@@ -198,14 +244,16 @@ the paginated records from `output-items`; use `get_report_results` to retrieve 
 Dingo and Retrieval reports, `dingo_result.summary.task_id` is the report ID (`Output.id`).
 
 `update_report` accepts a JSON body containing only the page-editable fields `name` and/or
-`description`. `get_report_log` returns the persisted log, or the report message when no log was
-captured. `get_report_share_url` only constructs the existing public URL; it does not create a
+`description`. `get_report_log` reads the report's dedicated `log.txt`, or returns the historical
+inline `outputs.log` content for records created before file-backed logs. It does not fall back to
+the report message. `get_report_share_url` only constructs the existing public URL; it does not create a
 share token or change server state. On that public page, `dingo_result.summary` is intentionally
 limited to `task_id`, `task_name`, `create_time`, `finish_time`, `score`, `num_good`, `num_bad`,
 `total`, `type_count`, `type_ratio`, `label_stats`, `metrics_score_stats`, `token_usage_stats`, and
 `statistics`; use authenticated report actions when other report details are needed.
 `download_report` requires `--output PATH` and saves the ZIP archive to that location without
-overwriting an existing file.
+overwriting an existing file. The archive's `summary.json` is rewritten to the same safe-field
+allowlist used by the public `dingo_summary` view; other archived files are unchanged.
 
 ## Metric Actions
 
@@ -216,6 +264,7 @@ groups, and user-defined custom LLM metrics as the same resource.
 
 | User intent | Action | Backend API |
 |---|---|---|
+| Count available SDK metrics | `get_metric_stats` | `GET /api/v1/metrics/stats` |
 | List, search, or filter available SDK metrics | `list_metrics` | `GET /api/v1/metrics/list` |
 
 Use `--type rule` or `--type llm` to filter by metric type. `--search` matches metric name,
@@ -277,9 +326,13 @@ Use `node scripts/metric_actions.mjs actions` to see all parameters.
 5. Before deleting a dataset, experiment, experiment schedule, report, metric group, grouped metric, or custom metric, identify the exact target and obtain confirmation unless the user explicitly requested deletion of that exact target in the current message. Use soft dataset deletion by default; use `--hard-delete` only when explicitly requested.
 6. For `start_experiment`, use the user's report name and description. If no report name is provided, get the experiment and generate `<experiment_name>_YYYYMMDD_HHMMSS`; use an empty description when omitted.
 7. After starting an experiment, use `get_experiment` to check status. Stop polling when status is no longer `running`.
-8. When the user asks to follow a running report's log, call `get_report_log` every 3 seconds and stop when its status is `success`, `failed`, `error`, or `stopped`.
+8. Read a report log only when the user asks. Do not poll it automatically; call `get_report_log` again only for an explicit refresh request.
 9. Execute actions in order. If one fails, stop dependent actions and report the API error.
 10. Return the completed actions and important result fields, such as resource name, ID, and status.
+
+Use the module statistics actions for count-only requests. Dataset, experiment, and report
+statistics are scoped to the authenticated user; metric statistics describe the system-wide
+SDK catalog and include `total`, `rule`, and `llm` counts.
 
 Examples of composition:
 
@@ -292,3 +345,13 @@ Examples of composition:
 - “Download report R” → `list_reports` when needed, then `download_report` to the requested local path.
 - “Create metric group G with metrics A and B” → `create_metric_group`, then `add_metric_to_group` for A and B.
 - “Draft a custom relevance metric” → `draft_custom_metric`; create it only after the user asks to save it.
+
+## Fusion Experiments (API only)
+
+Fusion experiment registration (`/api/v1/fusion/*`, contract `fusion-v1`) has no skill action script yet; do not claim it is available through the actions above. When a user asks to register harness experiments or runs, point them to `docs/services/fusion-experiment-api.md` and `scripts/register_runs_from_table.py` (registers a case/session table in batches of 500). Executor API keys need `POST /api/v1/fusion/experiments`, `POST /api/v1/fusion/experiments/{experiment_id}/runs` and `POST /api/v1/fusion/experiments/{experiment_id}:close`; orbit-board only needs the two `GET` routes.
+
+Fusion taxonomy and pattern catalog (`GET /api/v1/fusion/taxonomy`, `GET /api/v1/fusion/patterns`) are documented in `docs/services/fusion-pattern-api.md`. Pattern status changes (`PATCH /api/v1/fusion/patterns/{pattern_id}`) require a maintainer key; RSI read-only keys must not include that route. Discovery runs in the separate `mining-worker` process (`python -m app.jobs.mining`), never inside uvicorn.
+
+P4 adds two governance routes:
+- `GET /api/v1/fusion/calibration?project_id=&latest=true` returns monthly judge agreement (κ/Spearman/matrix); orbit syncs it and the release gate may require a fresh verdict calibration.
+- `POST /api/v1/fusion/experiments/{experiment_id}:approve` records `{decision, note}` and appends `fusion_audit_log`; it requires `access_level >= 9`, does not change experiment status, and should be mentioned whenever a user asks whether an experiment is approved. The dataset-export route is not implemented yet.

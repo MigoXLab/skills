@@ -15,6 +15,12 @@ import {
 } from "./lib/dingo_client.mjs";
 
 const ACTIONS = {
+  get_report_stats: {
+    page: "report_list",
+    method: "GET",
+    path: "/api/v1/outputs/stats",
+    options: "",
+  },
   list_reports: {
     page: "report_list",
     method: "GET",
@@ -44,13 +50,13 @@ const ACTIONS = {
     page: "report_results",
     method: "COMPOSITE",
     path: "/api/v1/outputs/{report_id} + /api/v1/output-items/output/{report_id}",
-    options: "--report-id ID [--eval-status all|true|false] [--label TEXT] [--skip N] [--limit N]",
+    options: "--report-id ID [--dingo-id ID] [--eval-status all|true|false] [--label TEXT] [--skip N] [--limit N]",
   },
   list_report_results: {
     page: "report_results",
     method: "GET",
     path: "/api/v1/output-items/output/{report_id}",
-    options: "--report-id ID [--eval-status all|true|false] [--label TEXT] [--skip N] [--limit N]",
+    options: "--report-id ID [--dingo-id ID] [--eval-status all|true|false] [--label TEXT] [--skip N] [--limit N]",
   },
   get_report_result: {
     page: "report_results",
@@ -61,7 +67,25 @@ const ACTIONS = {
   get_report_log: {
     page: "report_list",
     method: "GET",
-    path: "/api/v1/outputs/{report_id}",
+    path: "/api/v1/outputs/{report_id}/log",
+    options: "--report-id ID",
+  },
+  generate_report_ai_summary: {
+    page: "report_results",
+    method: "POST",
+    path: "/api/v1/outputs/{report_id}/ai-summary",
+    options: "--report-id ID",
+  },
+  get_report_ai_summary: {
+    page: "report_results",
+    method: "GET",
+    path: "/api/v1/outputs/{report_id}/ai-summary",
+    options: "--report-id ID",
+  },
+  delete_report_ai_summary: {
+    page: "report_results",
+    method: "DELETE",
+    path: "/api/v1/outputs/{report_id}/ai-summary",
     options: "--report-id ID",
   },
   get_report_share_url: {
@@ -110,6 +134,8 @@ function filterReports(result, search) {
 
 async function execute(action, args) {
   switch (action) {
+    case "get_report_stats":
+      return callApi("GET", ACTIONS[action].path);
     case "list_reports": {
       const result = await callApi("GET", ACTIONS[action].path, {
         query: {
@@ -125,6 +151,9 @@ async function execute(action, args) {
     }
     case "get_report_detail":
     case "delete_report":
+    case "generate_report_ai_summary":
+    case "get_report_ai_summary":
+    case "delete_report_ai_summary":
       return callApi(ACTIONS[action].method, reportPath(action, args));
     case "update_report":
       return callApi("PUT", reportPath(action, args), { json: await readJsonBody(args) });
@@ -135,6 +164,7 @@ async function execute(action, args) {
         limit: parseIntegerOption(args, "limit", 100),
         eval_status: parseEvalStatus(args),
         label: args.label,
+        dingo_id: args["dingo-id"],
       };
       const [report, results] = await Promise.all([
         callApi("GET", `/api/v1/outputs/${reportId}`),
@@ -149,6 +179,7 @@ async function execute(action, args) {
           limit: parseIntegerOption(args, "limit", 100),
           eval_status: parseEvalStatus(args),
           label: args.label,
+          dingo_id: args["dingo-id"],
         },
       });
     case "get_report_result": {
@@ -158,9 +189,10 @@ async function execute(action, args) {
     case "get_report_log": {
       const report = await callApi("GET", reportPath(action, args));
       return {
-        report_id: report.id,
+        report_id: report.output_id,
         status: report.status,
-        log: report.log || report.message || null,
+        source: report.source,
+        log: report.log,
       };
     }
     case "get_report_share_url": {

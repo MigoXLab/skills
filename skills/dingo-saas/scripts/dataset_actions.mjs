@@ -14,6 +14,11 @@ import {
 } from "./lib/dingo_client.mjs";
 
 const ACTIONS = {
+  get_dataset_stats: {
+    method: "GET",
+    path: "/api/v1/datasets/stats",
+    options: "",
+  },
   list_datasets: {
     method: "GET",
     path: "/api/v1/datasets/",
@@ -73,6 +78,8 @@ function showActions() {
 
 async function execute(action, args) {
   switch (action) {
+    case "get_dataset_stats":
+      return callApi("GET", ACTIONS[action].path);
     case "list_datasets":
       return callApi("GET", ACTIONS[action].path, {
         query: {
